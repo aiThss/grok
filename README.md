@@ -4,7 +4,7 @@ A private, mobile-first Grok workspace. It proxies the Grok API from the server,
 
 ## Included
 
-- Streaming Grok chat with local conversation history on the device
+- Reliable Grok chat with local conversation history on the device
 - Model picker populated from the configured OpenAI-compatible endpoint
 - Image generation through `/v1/images/generations` when the gateway exposes an Imagine model
 - Password-protected personal workspace
@@ -62,6 +62,19 @@ SESSION_SECRET
 ```
 
 Add `GITHUB_TOKEN`, `GITHUB_ALLOWED_REPOS`, and `GITHUB_BRANCH` to enable the GitHub tab.
+
+### Required build argument for Next.js
+
+In **Environment → Build Time Arguments**, add `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` with one persistent, Base64-encoded 32-byte value. Generate it once, save it in a password manager, and use that exact value for every redeploy:
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+[Convert]::ToBase64String($bytes)
+```
+
+This build argument prevents Next.js client/server build mismatches that can otherwise show `Failed to find Server Action` after a self-hosted deployment. Do not commit this value or add it to a browser-visible `NEXT_PUBLIC_` variable.
 
 ## Install on a phone
 
