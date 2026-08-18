@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSession, passwordIsConfigured, sessionCookie, verifyPassword } from "../../../../lib/auth";
+import { authConfigurationError, createSession, sessionCookie, verifyPassword } from "../../../../lib/auth";
 import { jsonError, readJson } from "../../../../lib/guard";
 
 export const runtime = "nodejs";
@@ -10,9 +10,8 @@ export async function POST(request) {
   if (origin && host && new URL(origin).host !== host) {
     return jsonError("Yêu cầu bị chặn do origin không hợp lệ.", 403);
   }
-  if (!passwordIsConfigured()) {
-    return jsonError("APP_PASSWORD has not been configured on the server.", 503);
-  }
+  const configurationError = authConfigurationError();
+  if (configurationError) return jsonError(configurationError, 503);
 
   const body = await readJson(request);
   if (!body || !verifyPassword(body.password)) {

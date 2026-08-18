@@ -24,7 +24,7 @@ function Message({ message }) {
   );
 }
 
-function Login({ configured, onLogin }) {
+function Login({ configured, configurationError, onLogin }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -49,7 +49,9 @@ function Login({ configured, onLogin }) {
         <p className="eyebrow">PRIVATE WORKSPACE</p>
         <h1>Grok Pocket</h1>
         <p className="muted">Grok cá nhân, tối ưu cho điện thoại và các repo GitHub của bạn.</p>
-        {configured ? (
+        {configurationError ? (
+          <p className="form-error">{configurationError}</p>
+        ) : configured ? (
           <form onSubmit={submit} className="login-form">
             <label htmlFor="password">Mật khẩu ứng dụng</label>
             <input
@@ -333,12 +335,12 @@ function App() {
 }
 
 export default function Home() {
-  const [state, setState] = useState({ checking: true, authenticated: false, configured: false });
+  const [state, setState] = useState({ checking: true, authenticated: false, configured: false, configurationError: "" });
 
   useEffect(() => {
     requestJson("/api/auth/session")
-      .then((payload) => setState({ checking: false, authenticated: payload.authenticated, configured: payload.passwordConfigured }))
-      .catch(() => setState({ checking: false, authenticated: false, configured: false }));
+      .then((payload) => setState({ checking: false, authenticated: payload.authenticated, configured: payload.passwordConfigured, configurationError: payload.configurationError || "" }))
+      .catch(() => setState({ checking: false, authenticated: false, configured: false, configurationError: "Không thể kiểm tra cấu hình máy chủ." }));
   }, []);
 
   async function login(password) {
@@ -347,6 +349,6 @@ export default function Home() {
   }
 
   if (state.checking) return <main className="loading-screen"><div className="loader" />Đang mở workspace…</main>;
-  if (!state.authenticated) return <Login configured={state.configured} onLogin={login} />;
+  if (!state.authenticated) return <Login configured={state.configured} configurationError={state.configurationError} onLogin={login} />;
   return <App />;
 }
