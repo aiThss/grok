@@ -1,5 +1,11 @@
 import "./globals.css";
 
+// This personal workspace is served behind a CDN and is redeployed often.
+// Always render the app shell at request time so a browser never combines an
+// older prerendered shell with JavaScript from a newer Next.js build.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata = {
   title: "Grok Pocket",
   description: "A private mobile Grok workspace with direct GitHub tools.",
