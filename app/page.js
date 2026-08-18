@@ -268,7 +268,12 @@ function App() {
   }, []);
 
   useEffect(() => { if (historyReady) window.localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-80))); }, [messages, historyReady]);
-  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), [messages, sending]);
+  // Effects may only return a cleanup function. Keep this block explicit: a
+  // browser implementation or polyfill must never leak a scroll result to
+  // React as an invalid cleanup value when chat state changes.
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, sending]);
 
   async function install() {
     if (!deferredInstall) return;
