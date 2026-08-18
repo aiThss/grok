@@ -1,7 +1,12 @@
-const CACHE = "grok-pocket-static-v1";
+const CACHE = "grok-pocket-static-v2";
 
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener("activate", (event) => event.waitUntil(
+  Promise.all([
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))),
+    self.clients.claim(),
+  ]),
+));
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);

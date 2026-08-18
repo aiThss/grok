@@ -288,32 +288,10 @@ function App() {
     setError("");
     try {
       const response = await fetch("/api/chat", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: next.slice(0, -1), model }) });
-      if (!response.ok || !response.body) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || "Không thể kết nối Grok.");
-      }
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let answer = "";
-      const append = (text) => { answer += text; setMessages((current) => [...current.slice(0, -1), { role: "assistant", content: answer }]); };
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const chunks = buffer.split("\n\n");
-        buffer = chunks.pop() || "";
-        for (const chunk of chunks) {
-          const data = chunk.split("\n").filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("");
-          if (!data || data === "[DONE]") continue;
-          try {
-            const payload = JSON.parse(data);
-            const delta = payload?.choices?.[0]?.delta?.content;
-            if (typeof delta === "string") append(delta);
-          } catch { /* Ignore non-standard SSE keep-alive events. */ }
-        }
-      }
-      if (!answer) setMessages((current) => [...current.slice(0, -1), { role: "assistant", content: "Không nhận được nội dung từ model." }]);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Không thể kết nối Grok.");
+      const answer = typeof payload.content === "string" ? payload.content : "";
+      setMessages((current) => [...current.slice(0, -1), { role: "assistant", content: answer || "Không nhận được nội dung từ model." }]);
     } catch (reason) {
       setMessages((current) => current.slice(0, -1));
       setError(reason instanceof Error ? reason.message : "Đã có lỗi xảy ra.");
