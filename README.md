@@ -5,7 +5,7 @@ A private, mobile-first Grok workspace. It proxies the Grok API from the server,
 ## Included
 
 - Reliable Grok chat with local conversation history on the device
-- Model picker populated from the configured OpenAI-compatible endpoint
+- One locked Grok model, configured through `GROK_DEFAULT_MODEL`
 - Image generation through `/v1/images/generations` when the gateway exposes an Imagine model
 - Password-protected personal workspace
 - Installable PWA for Android and iPhone
@@ -62,6 +62,8 @@ SESSION_SECRET
 ```
 
 Add `GITHUB_TOKEN`, `GITHUB_ALLOWED_REPOS`, and `GITHUB_BRANCH` to enable the GitHub tab.
+
+`GROK_DEFAULT_MODEL` is also the only model permitted by the app. This avoids selecting gateway-advertised models that are not actually available to the upstream account.
 
 ### Required build argument for Next.js
 
