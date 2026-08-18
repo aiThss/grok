@@ -6,12 +6,19 @@ A private, mobile-first Grok workspace. It proxies the Grok API from the server,
 
 - Streaming Grok chat with local conversation history on the device
 - Model picker populated from the configured OpenAI-compatible endpoint
+- Image generation through `/v1/images/generations` when the gateway exposes an Imagine model
 - Password-protected personal workspace
 - Installable PWA for Android and iPhone
 - GitHub workspace: select files, request a change, inspect the generated proposal, and commit directly to `main`
 - Optional auto-push mode, enabled by default in the GitHub screen
 
 The app does not expose either the Grok API key or GitHub token to the browser or APK. It does not execute shell commands or clone repositories.
+
+## Grok2API gateway compatibility
+
+Grok Pocket uses the OpenAI-compatible paths exposed by [Grok2API](https://github.com/chenyme/grok2api): `/v1/models`, `/v1/chat/completions`, and `/v1/images/generations`. Point `GROK_BASE_URL` at the gateway's `/v1` URL and set `GROK_API_KEY` to one of its client keys. The gateway keeps its account pools and provider credentials separate from Grok Pocket.
+
+If no image-capable model is returned from `/v1/models`, the Images tab will report the gateway error rather than falling back to an unknown model.
 
 ## Local development
 

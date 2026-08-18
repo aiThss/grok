@@ -72,7 +72,7 @@ function Login({ configured, onLogin }) {
   );
 }
 
-function GithubWorkspace({ models, selectedModel }) {
+function GithubWorkspace({ selectedModel }) {
   const [repositories, setRepositories] = useState([]);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [files, setFiles] = useState([]);
@@ -190,6 +190,50 @@ function GithubWorkspace({ models, selectedModel }) {
   );
 }
 
+function ImageStudio({ models }) {
+  const imageModels = useMemo(() => models.filter((item) => item.id.includes("imagine-image")), [models]);
+  const [model, setModel] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [size, setSize] = useState("1024x1024");
+  const [images, setImages] = useState([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!model && imageModels.length) setModel(imageModels[0].id);
+  }, [imageModels, model]);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!model || !prompt.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      const payload = await requestJson("/api/images", { method: "POST", body: JSON.stringify({ prompt, model, size }) });
+      setImages(payload.images || []);
+    } catch (reason) {
+      setError(reason.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="image-studio">
+      <div className="section-heading"><div><p className="eyebrow">GROK2API GATEWAY</p><h2>Imagine</h2></div><span className="branch-badge">{imageModels.length} model{imageModels.length === 1 ? "" : "s"}</span></div>
+      <p className="muted">Tạo ảnh qua gateway hiện tại. Model hiển thị ở đây được lấy trực tiếp từ <code>/v1/models</code>.</p>
+      {imageModels.length ? <form className="image-form" onSubmit={submit}>
+        <label>Model<select value={model} onChange={(event) => setModel(event.target.value)}>{imageModels.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label>Kích thước<select value={size} onChange={(event) => setSize(event.target.value)}><option value="1024x1024">Vuông</option><option value="1536x1024">Ngang</option><option value="1024x1536">Dọc</option></select></label>
+        <label>Prompt<textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={6} placeholder="Một bản minh họa tối giản của trợ lý AI trong không gian làm việc đêm, tông tím và xanh mint…" /></label>
+        {error && <p className="form-error">{error}</p>}
+        <button className="primary-button" disabled={busy || !prompt.trim()}>{busy ? "Đang tạo ảnh…" : "Tạo ảnh"}</button>
+      </form> : <p className="form-error">Gateway hiện không công bố model Imagine nào. Kiểm tra Model Routes trong Grok2API, sau đó refresh trang.</p>}
+      {images.length > 0 && <div className="image-results">{images.map((image, index) => { const source = image.url || (image.b64Json ? `data:image/png;base64,${image.b64Json}` : null); return source ? <figure key={`${source.slice(0, 40)}-${index}`}><img src={source} alt={image.revisedPrompt || prompt} />{image.revisedPrompt && <figcaption>{image.revisedPrompt}</figcaption>}<a href={source} target="_blank" rel="noreferrer">Mở ảnh ↗</a></figure> : null; })}</div>}
+    </section>
+  );
+}
+
 function App() {
   const [tab, setTab] = useState("chat");
   const [messages, setMessages] = useState([]);
@@ -282,8 +326,8 @@ function App() {
         <button className="brand" onClick={() => setTab("chat")}><span className="brand-mark">G</span><span>Grok Pocket</span></button>
         <div className="top-actions">{deferredInstall && <button className="secondary-button" onClick={install}>Cài app</button>}<button className="secondary-button" onClick={() => { window.localStorage.removeItem(HISTORY_KEY); setMessages([]); }}>Chat mới</button></div>
       </header>
-      <nav className="tabs" aria-label="Primary"><button className={tab === "chat" ? "active" : ""} onClick={() => setTab("chat")}>Chat</button><button className={tab === "github" ? "active" : ""} onClick={() => setTab("github")}>GitHub</button></nav>
-      {tab === "chat" ? <section className="chat-shell"><div className="chat-toolbar"><div><p className="eyebrow">PRIVATE AI</p><h1>Hôm nay mình làm gì?</h1></div><select value={model} onChange={(event) => setModel(event.target.value)} aria-label="Chọn model">{(models.length ? models : [{ id: model || "grok-4.5", name: model || "grok-4.5" }]).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div><div className="messages">{messages.length === 0 && <div className="welcome"><div className="welcome-orb">✦</div><h2>Grok, theo cách của bạn.</h2><p>Hỏi bất kỳ điều gì, viết code, hoặc chuyển sang GitHub để thay đổi repo.</p><div className="prompt-grid">{["Giải thích repository này nên được tổ chức thế nào", "Viết API đăng nhập an toàn bằng Next.js", "Giúp tôi debug lỗi TypeScript"].map((suggestion) => <button key={suggestion} onClick={() => setDraft(suggestion)}>{suggestion}</button>)}</div></div>}{messages.map((message, index) => <Message key={`${message.role}-${index}`} message={message} />)}<div ref={bottomRef} /></div>{error && <p className="form-error chat-error">{error}</p>}<form onSubmit={send} className="composer"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Nhắn Grok…" rows={2} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} /><button className="send-button" disabled={sending || !draft.trim()} aria-label="Gửi">↑</button></form><p className="composer-hint">Enter để gửi · Shift + Enter để xuống dòng</p></section> : <GithubWorkspace models={models} selectedModel={model} />}
+      <nav className="tabs" aria-label="Primary"><button className={tab === "chat" ? "active" : ""} onClick={() => setTab("chat")}>Chat</button><button className={tab === "images" ? "active" : ""} onClick={() => setTab("images")}>Ảnh</button><button className={tab === "github" ? "active" : ""} onClick={() => setTab("github")}>GitHub</button></nav>
+      {tab === "chat" ? <section className="chat-shell"><div className="chat-toolbar"><div><p className="eyebrow">PRIVATE AI</p><h1>Hôm nay mình làm gì?</h1></div><select value={model} onChange={(event) => setModel(event.target.value)} aria-label="Chọn model">{(models.length ? models : [{ id: model || "grok-4.5", name: model || "grok-4.5" }]).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div><div className="messages">{messages.length === 0 && <div className="welcome"><div className="welcome-orb">✦</div><h2>Grok, theo cách của bạn.</h2><p>Hỏi bất kỳ điều gì, viết code, tạo ảnh, hoặc chuyển sang GitHub để thay đổi repo.</p><div className="prompt-grid">{["Giải thích repository này nên được tổ chức thế nào", "Viết API đăng nhập an toàn bằng Next.js", "Giúp tôi debug lỗi TypeScript"].map((suggestion) => <button key={suggestion} onClick={() => setDraft(suggestion)}>{suggestion}</button>)}</div></div>}{messages.map((message, index) => <Message key={`${message.role}-${index}`} message={message} />)}<div ref={bottomRef} /></div>{error && <p className="form-error chat-error">{error}</p>}<form onSubmit={send} className="composer"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Nhắn Grok…" rows={2} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} /><button className="send-button" disabled={sending || !draft.trim()} aria-label="Gửi">↑</button></form><p className="composer-hint">Enter để gửi · Shift + Enter để xuống dòng</p></section> : tab === "images" ? <ImageStudio models={models} /> : <GithubWorkspace selectedModel={model} />}
     </main>
   );
 }
