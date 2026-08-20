@@ -5,6 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 const HISTORY_KEY = "grok-pocket-history-v1";
 const CHAT_REQUEST_TIMEOUT_MS = 100_000;
 
+function usableMessage(message) {
+  return ["user", "assistant", "system"].includes(message?.role) && typeof message.content === "string" && message.content.trim();
+}
+
 function responseError(response, payload) {
   if (typeof payload?.error === "string" && payload.error.trim()) return payload.error;
 
@@ -353,7 +357,11 @@ function App() {
   useEffect(() => {
     const rawHistory = window.localStorage.getItem(HISTORY_KEY);
     if (rawHistory) {
-      try { setMessages(JSON.parse(rawHistory)); } catch { window.localStorage.removeItem(HISTORY_KEY); }
+      try {
+        const saved = JSON.parse(rawHistory);
+        if (Array.isArray(saved)) setMessages(saved.filter(usableMessage).slice(-80));
+        else window.localStorage.removeItem(HISTORY_KEY);
+      } catch { window.localStorage.removeItem(HISTORY_KEY); }
     }
     setHistoryReady(true);
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -384,7 +392,11 @@ function App() {
     const content = draft.trim();
     if (!content || sendingRef.current || !gatewayReady || !model) return;
     sendingRef.current = true;
-    const next = [...messages, { role: "user", content }, { role: "assistant", content: "" }];
+    // A browser may have stored an unfinished assistant bubble after a
+    // deployment or a lost connection. Do not send that empty message back to
+    // the API; it would make the whole conversation invalid.
+    const conversation = messages.filter(usableMessage).slice(-80);
+    const next = [...conversation, { role: "user", content }, { role: "assistant", content: "" }];
     setMessages(next);
     setDraft("");
     setSending(true);
