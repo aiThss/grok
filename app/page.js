@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const HISTORY_KEY = "grok-pocket-history-v1";
 
@@ -242,11 +242,28 @@ function App() {
   const [draft, setDraft] = useState("");
   const [models, setModels] = useState([]);
   const [model, setModel] = useState("");
+  const [gatewayReady, setGatewayReady] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [deferredInstall, setDeferredInstall] = useState(null);
   const [historyReady, setHistoryReady] = useState(false);
   const bottomRef = useRef(null);
+
+  const loadModels = useCallback(async () => {
+    setGatewayReady(false);
+    setError("");
+    try {
+      const payload = await requestJson("/api/models");
+      const nextModels = payload.models || [];
+      setModels(nextModels);
+      setModel(payload.defaultModel || nextModels[0]?.id || "");
+      setGatewayReady(true);
+    } catch (reason) {
+      setModels([]);
+      setModel("");
+      setError(reason instanceof Error ? reason.message : "Không thể kiểm tra kết nối Grok.");
+    }
+  }, []);
 
   useEffect(() => {
     const rawHistory = window.localStorage.getItem(HISTORY_KEY);
@@ -260,12 +277,7 @@ function App() {
     return () => window.removeEventListener("beforeinstallprompt", handleInstall);
   }, []);
 
-  useEffect(() => {
-    requestJson("/api/models").then((payload) => {
-      setModels(payload.models || []);
-      setModel(payload.defaultModel || payload.models?.[0]?.id || "grok-4.5");
-    }).catch((reason) => setError(reason.message));
-  }, []);
+  useEffect(() => { loadModels(); }, [loadModels]);
 
   useEffect(() => { if (historyReady) window.localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-80))); }, [messages, historyReady]);
   // Effects may only return a cleanup function. Keep this block explicit: a
@@ -285,7 +297,7 @@ function App() {
   async function send(event) {
     event?.preventDefault();
     const content = draft.trim();
-    if (!content || sending) return;
+    if (!content || sending || !gatewayReady || !model) return;
     const next = [...messages, { role: "user", content }, { role: "assistant", content: "" }];
     setMessages(next);
     setDraft("");
@@ -312,7 +324,7 @@ function App() {
         <div className="top-actions">{deferredInstall && <button className="secondary-button" onClick={install}>Cài app</button>}<button className="secondary-button" onClick={() => { window.localStorage.removeItem(HISTORY_KEY); setMessages([]); }}>Chat mới</button></div>
       </header>
       <nav className="tabs" aria-label="Primary"><button className={tab === "chat" ? "active" : ""} onClick={() => setTab("chat")}>Chat</button><button className={tab === "images" ? "active" : ""} onClick={() => setTab("images")}>Ảnh</button><button className={tab === "github" ? "active" : ""} onClick={() => setTab("github")}>GitHub</button></nav>
-      {tab === "chat" ? <section className="chat-shell"><div className="chat-toolbar"><div><p className="eyebrow">PRIVATE AI</p><h1>Hôm nay mình làm gì?</h1></div><select value={model} disabled aria-label="Model bị khóa">{(models.length ? models : [{ id: model || "grok-4.5", name: model || "grok-4.5" }]).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div><div className="messages">{messages.length === 0 && <div className="welcome"><div className="welcome-orb">✦</div><h2>Grok, theo cách của bạn.</h2><p>Hỏi bất kỳ điều gì, viết code, tạo ảnh, hoặc chuyển sang GitHub để thay đổi repo.</p><div className="prompt-grid">{["Giải thích repository này nên được tổ chức thế nào", "Viết API đăng nhập an toàn bằng Next.js", "Giúp tôi debug lỗi TypeScript"].map((suggestion) => <button key={suggestion} onClick={() => setDraft(suggestion)}>{suggestion}</button>)}</div></div>}{messages.map((message, index) => <Message key={`${message.role}-${index}`} message={message} />)}<div ref={bottomRef} /></div>{error && <p className="form-error chat-error">{error}</p>}<form onSubmit={send} className="composer"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Nhắn Grok…" rows={2} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} /><button className="send-button" disabled={sending || !draft.trim()} aria-label="Gửi">↑</button></form><p className="composer-hint">Model được khóa theo cấu hình Dokploy · Enter để gửi · Shift + Enter để xuống dòng</p></section> : tab === "images" ? <ImageStudio models={models} /> : <GithubWorkspace selectedModel={model} />}
+      {tab === "chat" ? <section className="chat-shell"><div className="chat-toolbar"><div><p className="eyebrow">PRIVATE AI</p><h1>Hôm nay mình làm gì?</h1></div><select value={model} disabled aria-label="Model bị khóa">{(models.length ? models : [{ id: model, name: model || "Đang kiểm tra…" }]).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div><div className="messages">{messages.length === 0 && <div className="welcome"><div className="welcome-orb">✦</div><h2>Grok, theo cách của bạn.</h2><p>Hỏi bất kỳ điều gì, viết code, tạo ảnh, hoặc chuyển sang GitHub để thay đổi repo.</p><div className="prompt-grid">{["Giải thích repository này nên được tổ chức thế nào", "Viết API đăng nhập an toàn bằng Next.js", "Giúp tôi debug lỗi TypeScript"].map((suggestion) => <button key={suggestion} onClick={() => setDraft(suggestion)}>{suggestion}</button>)}</div></div>}{messages.map((message, index) => <Message key={`${message.role}-${index}`} message={message} />)}<div ref={bottomRef} /></div>{error && <div className="chat-error"><p className="form-error">{error}</p>{!gatewayReady && <button type="button" className="text-button" onClick={loadModels}>Thử lại kết nối</button>}</div>}<form onSubmit={send} className="composer"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Nhắn Grok…" rows={2} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} /><button className="send-button" disabled={sending || !gatewayReady || !model || !draft.trim()} aria-label="Gửi">↑</button></form><p className="composer-hint">Model được khóa theo cấu hình Dokploy · Enter để gửi · Shift + Enter để xuống dòng</p></section> : tab === "images" ? <ImageStudio models={models} /> : <GithubWorkspace selectedModel={model} />}
     </main>
   );
 }
