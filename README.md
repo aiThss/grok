@@ -1,33 +1,49 @@
-# Web Chat
+# Grok Pocket
 
-Repository này triển khai [Open WebUI](https://github.com/open-webui/open-webui): giao diện chat AI tự host, hỗ trợ API tương thích OpenAI và model Ollama chạy local. Repository **không** sao chép hay fork mã nguồn Open WebUI; Docker sẽ tải image chính thức đã ghim phiên bản, còn repository này quản lý cấu hình triển khai, tài liệu và quyết định vận hành.
+Web chat riêng tư, giao diện lấy cảm hứng từ trải nghiệm chat hiện đại của Grok, nhưng không liên kết hay tuyên bố là sản phẩm chính thức của xAI/grok.com.
 
-## Phạm vi phiên bản đầu
+## Tính năng
 
-- Web chat riêng tư, đa người dùng, chạy sau HTTPS.
-- Một hoặc nhiều gateway model tương thích OpenAI, bao gồm gateway tương thích Grok.
-- Lưu bền vững chat, tài khoản, tệp tải lên và dữ liệu vector tại `/app/backend/data`.
-- Tắt đăng ký tự do và tạo sẵn một tài khoản quản trị.
-- Chưa bật chia sẻ công khai, passthrough tới nhà cung cấp model, MCP, tool tùy ý, web search, nạp tài liệu RAG hoặc Ollama đóng gói sẵn.
+- Chat qua gateway tương thích OpenAI, khóa vào model `grok-4.5` cấu hình trên server.
+- Tạo ảnh qua endpoint `/v1/images/generations` với model ảnh cấu hình riêng.
+- GitHub Workspace: chỉ đọc repository trong allowlist, để AI đề xuất thay đổi, xem trước nội dung và tùy chọn commit thẳng vào `main`.
+- Đăng nhập bằng mật khẩu ứng dụng; API key Grok và GitHub token không bao giờ được gửi ra trình duyệt.
+- PWA cài được trên điện thoại và lưu lịch sử chat ở trình duyệt.
 
-Các tính năng tùy chọn trên làm tăng bề mặt tấn công hoặc chi phí vận hành. Chỉ bật sau khi luồng chat cơ bản đã ổn định.
+## Chạy local
 
-## Nội dung repository
+1. Sao chép `.env.example` thành `.env.local` và điền các secret thật.
+2. Cài dependency: `npm ci`.
+3. Chạy `npm run dev` rồi mở `http://localhost:3000`.
 
-- `Dockerfile` — sử dụng image Open WebUI chính thức đã ghim phiên bản.
-- `docker-compose.yml` — triển khai một node ở local hoặc máy chủ tự quản trị.
-- `.env.example` — mẫu cấu hình cho lần chạy đầu, không chứa secret.
-- `docs/DEPLOYMENT.md` — quy trình triển khai production trên Dokploy và checklist xác thực.
-- `docs/IMPLEMENTATION_PLAN.md` — kết quả nghiên cứu, kiến trúc và lộ trình theo giai đoạn.
+Muốn dùng Docker, sao chép `.env.example` thành `.env` và chạy `docker compose up -d --build`.
 
-## Kiểm tra nhanh ở local
+## Cấu hình bắt buộc
 
-1. Sao chép `.env.example` thành `.env`, rồi thay tất cả giá trị mẫu bằng giá trị riêng tư thật.
-2. Chạy `docker compose up -d --build`.
-3. Mở `http://127.0.0.1:3000`, đăng nhập bằng tài khoản quản trị khởi tạo, sau đó thêm/xác thực nhà cung cấp model.
+| Biến | Mục đích |
+| --- | --- |
+| `GROK_BASE_URL` | Base URL gateway tương thích OpenAI; có hoặc không có `/v1` đều được chuẩn hóa |
+| `GROK_API_KEY` | API key của gateway, chỉ có trên server |
+| `GROK_DEFAULT_MODEL` | Model chat duy nhất được phép, mặc định `grok-4.5` |
+| `GROK_IMAGE_MODEL` | Model tạo ảnh, mặc định `grok-imagine-image` |
+| `APP_PASSWORD` | Mật khẩu để mở web chat |
+| `SESSION_SECRET` | Chuỗi ngẫu nhiên tối thiểu 32 ký tự để ký session |
 
-Để triển khai public, dùng quy trình Dokploy và cấu hình HTTPS tại [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Không bao giờ commit `.env`, API key, bản sao cơ sở dữ liệu hoặc `/app/backend/data`.
+GitHub là tùy chọn. Dùng fine-grained token có quyền **Contents: Read and write** chỉ trên những repo đặt trong `GITHUB_ALLOWED_REPOS`. Auto-push mặc định tắt; luôn xem trước thay đổi trước khi commit.
 
-## Upstream và giấy phép
+## Deploy Dokploy
 
-Open WebUI là sản phẩm upstream có giấy phép và yêu cầu nhận diện thương hiệu riêng. Trước khi tùy biến giao diện hoặc phát hành bản đã sửa, hãy đọc [giấy phép Open WebUI](https://github.com/open-webui/open-webui/blob/main/LICENSE) hiện hành và giữ nguyên các yêu cầu về ghi nhận/nhận diện thương hiệu.
+1. Tạo **Application** từ repository này, chọn build **Dockerfile**.
+2. Đặt container port là `3000` và bật domain HTTPS.
+3. Đặt toàn bộ biến trong `.env.example` vào **Environment/Secrets** của Dokploy, không commit file `.env`.
+4. Thêm một build argument ổn định `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` là Base64 của 32 byte ngẫu nhiên.
+5. Deploy, mở domain và đăng nhập. Tab Ảnh và GitHub chỉ hoạt động khi gateway/token tương ứng được cấu hình.
+
+Dokploy reverse proxy cần giữ kết nối streaming đủ lâu; đặt read timeout ít nhất 300 giây nếu nền tảng cho phép. Sau mỗi deploy, thử chat, tạo ảnh và kiểm tra GitHub bằng một repository thử nghiệm trước.
+
+## An toàn
+
+- Không đưa `GROK_API_KEY`, `GITHUB_TOKEN`, `.env` hoặc session secret lên GitHub.
+- Chỉ thêm repository thật sự muốn AI đọc/sửa vào allowlist.
+- GitHub Workspace chặn `.env`, `.npmrc`, `.git/` và workflow CI để hạn chế thay đổi nhạy cảm.
+- Không bật auto-push trừ khi đã kiểm tra proposal; thao tác tạo commit là thay đổi không thể hoàn tác tự động.
