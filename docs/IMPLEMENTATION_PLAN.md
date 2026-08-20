@@ -1,66 +1,66 @@
-# Open WebUI web-chat: research and implementation plan
+# Kế hoạch nghiên cứu và triển khai web chat Open WebUI
 
-## Decision
+## Quyết định kiến trúc
 
-Deploy the official Open WebUI container image, pinned to `v0.11.0`, instead of rebuilding the project from source. The current stable release is `v0.11.0`; its feature set includes multi-user accounts, RBAC, OpenAI-compatible providers, chat history, file/RAG capabilities, and a responsive PWA. Pinning avoids unexpected schema or behaviour changes from the floating `main`/`dev` image tags.
+Triển khai image container Open WebUI chính thức, ghim ở phiên bản `v0.11.0`, thay vì tự build toàn bộ mã nguồn từ source. Bản phát hành ổn định hiện tại có sẵn tài khoản đa người dùng, RBAC, kết nối API tương thích OpenAI, lưu lịch sử chat, tải tệp/RAG và PWA. Ghim phiên bản tránh các thay đổi không dự báo được về schema dữ liệu hoặc hành vi từ các tag trôi nổi như `main` và `dev`.
 
-The application is a web-chat platform, not a thin frontend proxy. It owns accounts, chats, uploads, configuration, provider credentials stored by administrators, and optional vector data. Its persistent data directory is therefore a production dependency, not a cache.
+Ứng dụng là một nền tảng chat hoàn chỉnh, không phải frontend proxy mỏng. Nó quản lý tài khoản, chat, tệp tải lên, cấu hình, thông tin xác thực nhà cung cấp do quản trị viên lưu và dữ liệu vector tùy chọn. Vì vậy, thư mục dữ liệu bền vững là thành phần production bắt buộc, không phải cache.
 
-## Target architecture
+## Kiến trúc mục tiêu
 
 ```text
-Browser
+Trình duyệt
   │ HTTPS + WebSocket/SSE
   ▼
-Dokploy reverse proxy and TLS
-  │ port 8080
+Reverse proxy và TLS của Dokploy
+  │ cổng 8080
   ▼
-Open WebUI v0.11.0 container ─────► OpenAI-compatible gateway /v1
-  │                                        └─► Grok or other selected models
+Container Open WebUI v0.11.0 ─────► Gateway tương thích OpenAI /v1
+  │                                        └─► Grok hoặc các model đã chọn
   ▼
-Persistent Dokploy volume: /app/backend/data
-  ├─ accounts, chat history, configuration
-  ├─ uploads
-  ├─ vector database (when RAG is enabled)
-  └─ audit/cache files
+Volume Dokploy bền vững: /app/backend/data
+  ├─ tài khoản, lịch sử chat, cấu hình
+  ├─ tệp tải lên
+  ├─ cơ sở dữ liệu vector (khi bật RAG)
+  └─ audit/cache
 ```
 
-For the first release use one Open WebUI replica with its persistent volume. A future high-availability deployment must replace SQLite with PostgreSQL, add Redis, use shared object storage/vector infrastructure, and configure the same `WEBUI_SECRET_KEY` on every replica.
+Phiên bản đầu chỉ dùng một replica Open WebUI kèm volume bền vững. Khi cần high availability, phải thay SQLite bằng PostgreSQL, bổ sung Redis, dùng object storage/hạ tầng vector dùng chung và đặt cùng một `WEBUI_SECRET_KEY` trên mọi replica.
 
-## First-release requirements
+## Yêu cầu phiên bản đầu
 
-| Area | Decision |
+| Hạng mục | Quyết định |
 | --- | --- |
-| Image | `ghcr.io/open-webui/open-webui:v0.11.0` through this repository's Dockerfile |
-| Network | HTTPS public domain; reverse proxy must support WebSockets, SSE, and at least 300-second read timeouts |
-| Authentication | Local login, bootstrap admin only, `ENABLE_SIGNUP=false` |
-| Provider | OpenAI-compatible endpoint ending in the correct API version path (normally `/v1`) |
-| Provider access | Least-privilege API key and a model allowlist |
-| Persistent state | Dokploy volume mounted at `/app/backend/data` |
-| Backups | Encrypted copy of the full data volume before upgrades, then daily |
-| Observability | `/health` liveness check; authenticated `/api/models` model-connectivity check |
-| Excluded initially | public sharing, MCP/tools/functions, web search, RAG, image generation, voice, OAuth/SSO, Ollama |
+| Image | `ghcr.io/open-webui/open-webui:v0.11.0` qua Dockerfile trong repository |
+| Mạng | Domain HTTPS; reverse proxy hỗ trợ WebSocket, SSE và read timeout ít nhất 300 giây |
+| Xác thực | Đăng nhập local, chỉ có tài khoản quản trị khởi tạo, `ENABLE_SIGNUP=false` |
+| Nhà cung cấp | Endpoint tương thích OpenAI có đúng đường dẫn phiên bản API, thường là `/v1` |
+| Quyền provider | API key đặc quyền tối thiểu và allowlist model |
+| Dữ liệu | Volume Dokploy mount tại `/app/backend/data` |
+| Sao lưu | Sao lưu mã hóa toàn bộ volume trước mỗi nâng cấp và hằng ngày |
+| Giám sát | Healthcheck `/health`; kiểm tra kết nối model qua `/api/models` có xác thực |
+| Chưa triển khai | Chia sẻ public, MCP/tool/function, web search, RAG, tạo ảnh, voice, OAuth/SSO, Ollama |
 
-## Environment decisions
+## Quyết định về biến môi trường
 
-Set the public URL, CORS origin, cookie security, and `WEBUI_SECRET_KEY` before the first production start. Open WebUI persists several configuration values in its database; later environment changes may appear ignored because the saved Admin-panel value takes precedence. Use the Admin panel for ordinary settings after bootstrapping, or deliberately use `ENABLE_PERSISTENT_CONFIG=false` only for a fully environment-managed deployment.
+Phải đặt URL public, CORS origin, cookie bảo mật và `WEBUI_SECRET_KEY` trước lần chạy production đầu tiên. Open WebUI lưu một số cấu hình trong cơ sở dữ liệu; do đó thay đổi biến môi trường sau này có thể trông như bị bỏ qua vì giá trị đã lưu trong Admin panel được ưu tiên. Sau khi khởi tạo, hãy dùng Admin panel cho các cấu hình thông thường. Chỉ đặt `ENABLE_PERSISTENT_CONFIG=false` khi thực sự muốn mọi cấu hình hoàn toàn được quản lý bằng biến môi trường.
 
-`WEBUI_SECRET_KEY` must be long, random, stored in Dokploy Secrets, and kept stable. Rotating it invalidates current sessions and makes existing encrypted provider/plugin credentials unreadable. `ENABLE_VALVE_ENCRYPTION=true` protects secret values stored for plugins/functions; do not enable untrusted plugins in the first release.
+`WEBUI_SECRET_KEY` phải dài, ngẫu nhiên, lưu trong Dokploy Secrets và giữ ổn định. Đổi key sẽ làm mất hiệu lực phiên đăng nhập và khiến thông tin xác thực plugin/function đã mã hóa không đọc lại được. `ENABLE_VALVE_ENCRYPTION=true` bảo vệ secret lưu cho plugin/function; không bật plugin không đáng tin cậy trong phiên bản đầu.
 
-The provider URL must be the OpenAI-compatible base URL, including its API version. If a provider cannot answer `/models`, add its specific model IDs in the connection's allowlist from the Admin panel rather than exposing every upstream model.
+URL provider phải là base URL tương thích OpenAI, bao gồm đường dẫn phiên bản API. Nếu provider không hỗ trợ `/models`, thêm thủ công model ID cần dùng vào allowlist trong Admin panel thay vì mở toàn bộ danh sách model upstream.
 
-## Staged implementation
+## Triển khai theo giai đoạn
 
-1. **Foundation (this repository):** deploy the pinned official image, persistent storage, TLS domain, secrets, first admin, closed signup, one model gateway.
-2. **Acceptance:** verify user sign-in, model discovery/allowlist, streamed response, reconnect, file upload disabled/unused, and persistence after a container recreation.
-3. **Operations:** schedule backups, update only after staging, monitor `/health` and an authenticated `/api/models` request, retain deployment/application logs.
-4. **Hardening:** restrict CORS to the production domain, use secure cookies, disable passthrough, review admin roles, limit provider keys, and apply security headers in report-only mode before enforcing CSP.
-5. **Optional expansion:** enable RAG with capacity planning and backups; then consider SSO, web search, MCP/tools, object storage, PostgreSQL, Redis, and replicas as separate reviewed changes.
+1. **Nền tảng (repository này):** deploy image chính thức đã ghim phiên bản, storage bền vững, domain TLS, secret, admin đầu tiên, tắt signup và một gateway model.
+2. **Nghiệm thu:** kiểm tra đăng nhập, model discovery/allowlist, phản hồi streaming, reconnect và dữ liệu còn lại sau khi container được tạo lại.
+3. **Vận hành:** lập lịch backup, chỉ nâng cấp sau khi test staging, theo dõi `/health` và request `/api/models` có xác thực, lưu log deploy/application.
+4. **Gia cố:** giới hạn CORS vào domain production, secure cookie, tắt passthrough, rà soát role admin, giới hạn provider key và thử security header/CSP ở report-only trước khi ép buộc.
+5. **Mở rộng tùy chọn:** bật RAG sau khi có kế hoạch dung lượng và backup; rồi mới cân nhắc SSO, web search, MCP/tools, object storage, PostgreSQL, Redis và nhiều replica.
 
-## Non-goals and risks
+## Những điều không nằm trong phạm vi và rủi ro
 
-- This is not a license-free rebranding exercise; upstream license and branding obligations apply.
-- A Docker container without the data volume loses chat history, accounts, uploads, and configuration when recreated.
-- A reverse proxy without WebSocket support or correct CORS commonly produces chat connection failures even when the main page loads.
-- Provider management/master keys must not be used for ordinary chat traffic.
-- Do not expose Open WebUI's port directly to the internet when Dokploy's HTTPS proxy is available.
+- Đây không phải dự án đổi thương hiệu tự do: giấy phép và yêu cầu nhận diện thương hiệu của upstream vẫn áp dụng.
+- Container không có data volume sẽ mất lịch sử chat, tài khoản, tệp tải lên và cấu hình khi bị tạo lại.
+- Reverse proxy thiếu WebSocket hoặc CORS đúng thường gây lỗi kết nối chat dù trang chính vẫn tải được.
+- Không dùng provider management/master key cho lưu lượng chat thông thường.
+- Không mở trực tiếp cổng Open WebUI ra Internet khi có reverse proxy HTTPS của Dokploy.

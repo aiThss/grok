@@ -1,8 +1,8 @@
-# Deploy on Dokploy
+# Triển khai trên Dokploy
 
-## 1. Prepare secrets
+## 1. Chuẩn bị secret
 
-Create the following in Dokploy's secret/environment configuration. Do not add a real `.env` file to Git.
+Tạo các biến sau trong phần secret/environment của Dokploy. Không thêm file `.env` thật vào Git.
 
 ```text
 WEBUI_URL=https://chat.example.com
@@ -11,13 +11,13 @@ WEBUI_SESSION_COOKIE_SECURE=true
 WEBUI_SECRET_KEY=<openssl rand -hex 32>
 
 WEBUI_ADMIN_NAME=Admin
-WEBUI_ADMIN_EMAIL=<administrator email>
-WEBUI_ADMIN_PASSWORD=<long unique password>
+WEBUI_ADMIN_EMAIL=<email quản trị>
+WEBUI_ADMIN_PASSWORD=<mật khẩu dài, riêng biệt>
 ENABLE_SIGNUP=false
 DEFAULT_USER_ROLE=pending
 
 OPENAI_API_BASE_URL=https://gateway.example.com/v1
-OPENAI_API_KEY=<least-privilege provider key>
+OPENAI_API_KEY=<provider key đặc quyền tối thiểu>
 OPENAI_API_CONFIGS={"0":{"enable":true,"prefix_id":"ai","model_ids":["your-model-id"]}}
 ENABLE_OPENAI_API_PASSTHROUGH=false
 
@@ -25,59 +25,59 @@ ENABLE_VALVE_ENCRYPTION=true
 ENABLE_PERSISTENT_CONFIG=true
 ```
 
-Set `WEBUI_URL` and `CORS_ALLOW_ORIGIN` to the exact public HTTPS address before the first boot. Add every intentional browser origin, separated with semicolons, only if more than one domain is required.
+Đặt `WEBUI_URL` và `CORS_ALLOW_ORIGIN` bằng chính xác URL HTTPS public trước lần khởi động đầu tiên. Chỉ khi thật sự cần nhiều domain mới thêm các browser origin khác, ngăn cách bằng dấu chấm phẩy.
 
-## 2. Create the application
+## 2. Tạo ứng dụng
 
-1. In Dokploy, create an **Application** from this Git repository using **Dockerfile** build mode.
-2. Set the exposed application/container port to **8080**.
-3. Add persistent storage with mount path **`/app/backend/data`**. This mount is mandatory.
-4. Add the environment variables above as secrets; do not put them in build arguments or browser-visible variables.
-5. Add the public domain, enable HTTPS, then deploy.
+1. Trong Dokploy, tạo **Application** từ Git repository này ở chế độ build **Dockerfile**.
+2. Đặt cổng application/container là **8080**.
+3. Tạo persistent storage với mount path **`/app/backend/data`**. Mount này là bắt buộc.
+4. Thêm các biến môi trường ở trên dưới dạng secret; không đặt chúng vào build argument hoặc biến hiển thị cho trình duyệt.
+5. Thêm domain public, bật HTTPS rồi deploy.
 
-The Dockerfile uses a pinned upstream image. To upgrade, update `OPEN_WEBUI_VERSION` deliberately, deploy to staging first, take a backup, then promote the same tested version to production.
+Dockerfile dùng image upstream đã ghim phiên bản. Khi nâng cấp, hãy đổi `OPEN_WEBUI_VERSION` có chủ đích, deploy staging trước, backup dữ liệu, rồi mới đưa đúng phiên bản đã kiểm thử lên production.
 
-## 3. Reverse-proxy requirements
+## 3. Yêu cầu reverse proxy
 
-Dokploy's proxy/domain configuration must:
+Proxy/domain của Dokploy phải:
 
-- terminate HTTPS and forward to port 8080;
-- pass WebSocket `Upgrade` and `Connection` headers;
-- disable response buffering for streamed Server-Sent Events;
-- allow a read timeout of at least 300 seconds for slow model responses;
-- avoid exposing a separate direct host port to the public internet.
+- kết thúc HTTPS và chuyển tiếp đến cổng 8080;
+- chuyển tiếp header WebSocket `Upgrade` và `Connection`;
+- tắt response buffering cho Server-Sent Events streaming;
+- cho phép read timeout ít nhất 300 giây với phản hồi model chậm;
+- không mở một host port trực tiếp khác ra Internet.
 
-## 4. First-run procedure
+## 4. Quy trình chạy lần đầu
 
-1. Open the public `WEBUI_URL` and sign in with `WEBUI_ADMIN_EMAIL`/`WEBUI_ADMIN_PASSWORD`.
-2. In **Admin Settings → Connections → OpenAI**, verify the configured gateway and restrict the visible models to the approved model IDs.
-3. Send a short test prompt and confirm streaming completes.
-4. Restart/redeploy the application without deleting its persistent storage; confirm that the admin account, configuration, and test chat remain.
-5. Keep signup closed. When shared access is needed, create users or enable signup later with `DEFAULT_USER_ROLE=pending` so an administrator approves every account.
+1. Mở `WEBUI_URL` public và đăng nhập bằng `WEBUI_ADMIN_EMAIL`/`WEBUI_ADMIN_PASSWORD`.
+2. Vào **Admin Settings → Connections → OpenAI**, xác thực gateway và giới hạn model hiển thị ở các model ID đã phê duyệt.
+3. Gửi một prompt ngắn và xác nhận streaming hoàn tất.
+4. Restart/redeploy ứng dụng nhưng không xóa persistent storage; xác nhận tài khoản admin, cấu hình và chat thử vẫn còn.
+5. Giữ signup đóng. Khi cần cấp quyền chung, tạo tài khoản thủ công hoặc bật signup sau với `DEFAULT_USER_ROLE=pending` để quản trị viên duyệt từng tài khoản.
 
-## 5. Validate and monitor
+## 5. Kiểm tra và giám sát
 
 ```bash
-# Public service and database initialized
+# Kiểm tra service public và database đã khởi tạo
 curl -fsS https://chat.example.com/health
 
-# After creating a dedicated monitoring account/API key, also test models
+# Sau khi tạo tài khoản/API key riêng cho monitoring, kiểm tra model
 curl -fsS https://chat.example.com/api/models \\
   -H "Authorization: Bearer <monitoring-api-key>"
 ```
 
-Use `/health` for liveness and the authenticated `/api/models` check to detect a provider outage that would not affect the login page.
+Dùng `/health` cho liveness; dùng `/api/models` có xác thực để phát hiện provider lỗi dù trang đăng nhập vẫn hoạt động.
 
-## 6. Backup and recovery
+## 6. Sao lưu và khôi phục
 
-Back up the complete mounted data directory before every version update and at least daily. It includes `webui.db`, uploads, vector data, cache, and audit information. Encrypt backups and test a restore into an isolated staging instance. Never share a production data volume with a `:dev` image.
+Sao lưu toàn bộ thư mục data đã mount trước mỗi lần nâng cấp và ít nhất hằng ngày. Nó gồm `webui.db`, upload, vector data, cache và audit information. Mã hóa bản sao lưu, đồng thời thử phục hồi trên staging cô lập. Không dùng chung volume production với image `:dev`.
 
-## 7. Local alternative
+## 7. Lựa chọn chạy local
 
-For a server you administer directly, copy `.env.example` to `.env`, fill in secrets, then run:
+Nếu tự quản trị máy chủ, sao chép `.env.example` thành `.env`, điền secret rồi chạy:
 
 ```bash
 docker compose up -d --build
 ```
 
-The supplied compose file binds to `127.0.0.1:3000` by default; put a TLS-capable reverse proxy in front of it. Do not change it to a public bind address without completing the HTTPS, CORS, and firewall controls above.
+Compose được cung cấp bind mặc định vào `127.0.0.1:3000`; hãy đặt reverse proxy có TLS ở phía trước. Không đổi sang bind public khi chưa hoàn tất kiểm soát HTTPS, CORS và firewall nêu trên.

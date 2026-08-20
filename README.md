@@ -1,33 +1,33 @@
 # Web Chat
 
-This repository deploys [Open WebUI](https://github.com/open-webui/open-webui), an upstream self-hosted chat interface for OpenAI-compatible APIs and local Ollama models. It deliberately does **not** copy or fork Open WebUI source code: Docker pulls a pinned official image while this repository keeps deployment configuration, documentation, and operational decisions under version control.
+Repository này triển khai [Open WebUI](https://github.com/open-webui/open-webui): giao diện chat AI tự host, hỗ trợ API tương thích OpenAI và model Ollama chạy local. Repository **không** sao chép hay fork mã nguồn Open WebUI; Docker sẽ tải image chính thức đã ghim phiên bản, còn repository này quản lý cấu hình triển khai, tài liệu và quyết định vận hành.
 
-## Initial scope
+## Phạm vi phiên bản đầu
 
-- Private, multi-user web chat behind HTTPS.
-- One or more OpenAI-compatible model gateways (including a Grok-compatible gateway).
-- Persistent chat, account, upload, and vector data at `/app/backend/data`.
-- Closed sign-up and a bootstrap administrator.
-- No public sharing, model-provider passthrough, MCP, arbitrary tools, web search, RAG ingestion, or bundled Ollama in the first release.
+- Web chat riêng tư, đa người dùng, chạy sau HTTPS.
+- Một hoặc nhiều gateway model tương thích OpenAI, bao gồm gateway tương thích Grok.
+- Lưu bền vững chat, tài khoản, tệp tải lên và dữ liệu vector tại `/app/backend/data`.
+- Tắt đăng ký tự do và tạo sẵn một tài khoản quản trị.
+- Chưa bật chia sẻ công khai, passthrough tới nhà cung cấp model, MCP, tool tùy ý, web search, nạp tài liệu RAG hoặc Ollama đóng gói sẵn.
 
-Those optional features expand the attack surface or the operating cost. Enable them only after the core chat flow is stable.
+Các tính năng tùy chọn trên làm tăng bề mặt tấn công hoặc chi phí vận hành. Chỉ bật sau khi luồng chat cơ bản đã ổn định.
 
-## Repository contents
+## Nội dung repository
 
-- `Dockerfile` — wraps a pinned official Open WebUI image.
-- `docker-compose.yml` — local or self-managed single-node deployment.
-- `.env.example` — complete first-start configuration template without secrets.
-- `docs/DEPLOYMENT.md` — Dokploy production procedure and verification checklist.
-- `docs/IMPLEMENTATION_PLAN.md` — research outcome, architecture, and staged roadmap.
+- `Dockerfile` — sử dụng image Open WebUI chính thức đã ghim phiên bản.
+- `docker-compose.yml` — triển khai một node ở local hoặc máy chủ tự quản trị.
+- `.env.example` — mẫu cấu hình cho lần chạy đầu, không chứa secret.
+- `docs/DEPLOYMENT.md` — quy trình triển khai production trên Dokploy và checklist xác thực.
+- `docs/IMPLEMENTATION_PLAN.md` — kết quả nghiên cứu, kiến trúc và lộ trình theo giai đoạn.
 
-## Quick local validation
+## Kiểm tra nhanh ở local
 
-1. Copy `.env.example` to `.env` and replace every placeholder with real, private values.
-2. Run `docker compose up -d --build`.
-3. Open `http://127.0.0.1:3000`, sign in with the bootstrap administrator, and add/verify the model provider.
+1. Sao chép `.env.example` thành `.env`, rồi thay tất cả giá trị mẫu bằng giá trị riêng tư thật.
+2. Chạy `docker compose up -d --build`.
+3. Mở `http://127.0.0.1:3000`, đăng nhập bằng tài khoản quản trị khởi tạo, sau đó thêm/xác thực nhà cung cấp model.
 
-For a public deployment, use the Dokploy procedure and HTTPS configuration in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Never commit `.env`, API keys, database snapshots, or `/app/backend/data`.
+Để triển khai public, dùng quy trình Dokploy và cấu hình HTTPS tại [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Không bao giờ commit `.env`, API key, bản sao cơ sở dữ liệu hoặc `/app/backend/data`.
 
-## Upstream and licensing
+## Upstream và giấy phép
 
-Open WebUI is an upstream product with its own license and branding requirements. Before customising its UI or distributing a modified build, review the current [Open WebUI license](https://github.com/open-webui/open-webui/blob/main/LICENSE) and keep the required attribution/branding.
+Open WebUI là sản phẩm upstream có giấy phép và yêu cầu nhận diện thương hiệu riêng. Trước khi tùy biến giao diện hoặc phát hành bản đã sửa, hãy đọc [giấy phép Open WebUI](https://github.com/open-webui/open-webui/blob/main/LICENSE) hiện hành và giữ nguyên các yêu cầu về ghi nhận/nhận diện thương hiệu.
