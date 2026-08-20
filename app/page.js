@@ -3,6 +3,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const HISTORY_KEY = "grok-pocket-history-v1";
+const CHAT_REQUEST_TIMEOUT_MS = 100_000;
+
+function responseError(response, payload) {
+  if (typeof payload?.error === "string" && payload.error.trim()) return payload.error;
+
+  const status = response.status ? `HTTP ${response.status}` : "lỗi mạng";
+  if ([502, 503, 504].includes(response.status)) {
+    return `Máy chủ web đã ngắt yêu cầu (${status}) trước khi Grok trả lời. Hãy thử lại; nếu còn lặp lại, kiểm tra timeout reverse proxy của Dokploy.`;
+  }
+  return `Yêu cầu không thành công (${status}).`;
+}
+
+async function responsePayload(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Reverse proxies often return an HTML error page. Deliberately do not
+    // render its body in the UI; it is noisy and could include infrastructure
+    // information. `responseError` still surfaces its HTTP status.
+    return {};
+  }
+}
 
 async function requestJson(url, options) {
   const response = await fetch(url, {
@@ -10,8 +34,8 @@ async function requestJson(url, options) {
     ...options,
     headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
   });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || "Yêu cầu không thành công.");
+  const payload = await responsePayload(response);
+  if (!response.ok) throw new Error(responseError(response, payload));
   return payload;
 }
 
@@ -303,16 +327,23 @@ function App() {
     setDraft("");
     setSending(true);
     setError("");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch("/api/chat", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: next.slice(0, -1), model }) });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || "Không thể kết nối Grok.");
+      const response = await fetch("/api/chat", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: next.slice(0, -1), model }), signal: controller.signal });
+      const payload = await responsePayload(response);
+      if (!response.ok) throw new Error(responseError(response, payload));
       const answer = typeof payload.content === "string" ? payload.content : "";
       setMessages((current) => [...current.slice(0, -1), { role: "assistant", content: answer || "Không nhận được nội dung từ model." }]);
     } catch (reason) {
       setMessages((current) => current.slice(0, -1));
-      setError(reason instanceof Error ? reason.message : "Đã có lỗi xảy ra.");
+      if (reason instanceof DOMException && reason.name === "AbortError") {
+        setError("Yêu cầu chat đã quá 100 giây. Hãy thử lại; nếu còn lặp lại, kiểm tra gateway hoặc timeout reverse proxy của Dokploy.");
+      } else {
+        setError(reason instanceof Error ? reason.message : "Đã có lỗi xảy ra.");
+      }
     } finally {
+      window.clearTimeout(timeout);
       setSending(false);
     }
   }

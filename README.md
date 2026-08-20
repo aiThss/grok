@@ -39,7 +39,7 @@ GitHub là tùy chọn. Dùng fine-grained token có quyền **Contents: Read an
 4. Thêm một build argument ổn định `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` là Base64 của 32 byte ngẫu nhiên.
 5. Deploy, mở domain và đăng nhập. Tab Ảnh và GitHub chỉ hoạt động khi gateway/token tương ứng được cấu hình.
 
-Dokploy reverse proxy cần giữ kết nối streaming đủ lâu; đặt read timeout ít nhất 300 giây nếu nền tảng cho phép. Sau mỗi deploy, thử chat, tạo ảnh và kiểm tra GitHub bằng một repository thử nghiệm trước.
+Chat hiện yêu cầu một phản hồi JSON không-stream từ gateway. Vì vậy, đặt read timeout của reverse proxy Dokploy tối thiểu **120 giây** (lâu hơn timeout backend 90 giây). Sau mỗi deploy, thử chat, tạo ảnh và kiểm tra GitHub bằng một repository thử nghiệm trước.
 
 ## An toàn
 

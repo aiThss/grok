@@ -3,6 +3,7 @@ import { jsonError, readJson, requireSession } from "../../../lib/guard";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 100;
 
 export async function POST(request) {
   const denied = requireSession(request, { mutation: true });
