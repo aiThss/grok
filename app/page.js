@@ -28,6 +28,66 @@ async function responsePayload(response) {
   }
 }
 
+function textFromStreamEvent(payload) {
+  const content = payload?.choices?.[0]?.delta?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
+  }
+  return "";
+}
+
+async function readChatStream(response, onDelta) {
+  if (!response.body) throw new Error("Máy chủ không trả luồng chat.");
+  if (!response.headers.get("content-type")?.includes("text/event-stream")) {
+    const payload = await responsePayload(response);
+    throw new Error(responseError(response, payload));
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let content = "";
+
+  function consumeEvent(event) {
+    const data = event
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n");
+    if (!data || data === "[DONE]") return;
+
+    let payload;
+    try {
+      payload = JSON.parse(data);
+    } catch {
+      return;
+    }
+
+    const delta = textFromStreamEvent(payload);
+    if (!delta) return;
+    content += delta;
+    onDelta(content);
+  }
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const events = buffer.split(/\r?\n\r?\n/);
+      buffer = events.pop() || "";
+      events.forEach(consumeEvent);
+      if (done) break;
+    }
+    if (buffer.trim()) consumeEvent(buffer);
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (!content.trim()) throw new Error("Model không trả nội dung chat.");
+  return content;
+}
+
 async function requestJson(url, options) {
   const response = await fetch(url, {
     credentials: "same-origin",
@@ -272,6 +332,7 @@ function App() {
   const [deferredInstall, setDeferredInstall] = useState(null);
   const [historyReady, setHistoryReady] = useState(false);
   const bottomRef = useRef(null);
+  const sendingRef = useRef(false);
 
   const loadModels = useCallback(async () => {
     setGatewayReady(false);
@@ -321,7 +382,8 @@ function App() {
   async function send(event) {
     event?.preventDefault();
     const content = draft.trim();
-    if (!content || sending || !gatewayReady || !model) return;
+    if (!content || sendingRef.current || !gatewayReady || !model) return;
+    sendingRef.current = true;
     const next = [...messages, { role: "user", content }, { role: "assistant", content: "" }];
     setMessages(next);
     setDraft("");
@@ -331,10 +393,13 @@ function App() {
     const timeout = window.setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
     try {
       const response = await fetch("/api/chat", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: next.slice(0, -1), model }), signal: controller.signal });
-      const payload = await responsePayload(response);
-      if (!response.ok) throw new Error(responseError(response, payload));
-      const answer = typeof payload.content === "string" ? payload.content : "";
-      setMessages((current) => [...current.slice(0, -1), { role: "assistant", content: answer || "Không nhận được nội dung từ model." }]);
+      if (!response.ok) {
+        const payload = await responsePayload(response);
+        throw new Error(responseError(response, payload));
+      }
+      await readChatStream(response, (answer) => {
+        setMessages((current) => [...current.slice(0, -1), { role: "assistant", content: answer }]);
+      });
     } catch (reason) {
       setMessages((current) => current.slice(0, -1));
       if (reason instanceof DOMException && reason.name === "AbortError") {
@@ -344,6 +409,7 @@ function App() {
       }
     } finally {
       window.clearTimeout(timeout);
+      sendingRef.current = false;
       setSending(false);
     }
   }

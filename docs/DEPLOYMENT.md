@@ -38,7 +38,7 @@ Tạo thêm `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` bằng cùng lệnh trên và l
 | Gateway trả HTML | Base URL đang trỏ trang web thay vì endpoint API; dùng URL tương thích OpenAI với `/v1` |
 | `401` hoặc `403` từ gateway | API key sai, hết hạn hoặc thiếu quyền cho model |
 | `GROK_DEFAULT_MODEL ... is not available` | Sửa model ID hoặc mapping model tại gateway |
-| Chat báo `HTTP 502`, `503` hoặc `504` | Reverse proxy đã ngắt yêu cầu trước khi Grok trả lời. Đặt read timeout của Dokploy tối thiểu 120 giây, sau đó redeploy |
+| Chat báo `HTTP 502`, `503` hoặc `504` | Gateway hoặc reverse proxy đã ngắt luồng chat. Tắt response buffering và đặt read timeout của Dokploy tối thiểu 120 giây, sau đó redeploy |
 | Chat quá 100 giây | Gateway/model chat không trả lời trong thời hạn. Kiểm tra log gateway và mapping của `grok-4.5` |
 | GitHub không có repo | Kiểm tra token, `GITHUB_ALLOWED_REPOS`, quyền Contents và branch |
 

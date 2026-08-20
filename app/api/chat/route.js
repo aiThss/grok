@@ -1,9 +1,9 @@
-import { completeChat } from "../../../lib/grok";
+import { openChatStream } from "../../../lib/grok";
 import { jsonError, readJson, requireSession } from "../../../lib/guard";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-export const maxDuration = 100;
+export const maxDuration = 120;
 
 export async function POST(request) {
   const denied = requireSession(request, { mutation: true });
@@ -17,12 +17,18 @@ export async function POST(request) {
       model: body.model || "default",
       messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
     });
-    const content = await completeChat({ messages: body.messages, model: body.model });
-    console.info("[chat] completion completed", {
+    const stream = await openChatStream({ messages: body.messages, model: body.model });
+    console.info("[chat] stream opened", {
       model: body.model || "default",
-      contentLength: content.length,
     });
-    return NextResponse.json({ content });
+    return new NextResponse(stream, {
+      headers: {
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "X-Accel-Buffering": "no",
+      },
+    });
   } catch (error) {
     console.error("[chat] completion failed", {
       model: body.model || "default",
