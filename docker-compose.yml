@@ -1,0 +1,22 @@
+services:
+  open-webui:
+    build:
+      context: .
+      args:
+        OPEN_WEBUI_VERSION: ${OPEN_WEBUI_VERSION:-v0.11.0}
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${OPEN_WEBUI_BIND_ADDRESS:-127.0.0.1}:${OPEN_WEBUI_PORT:-3000}:8080"
+    volumes:
+      - open-webui-data:/app/backend/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  open-webui-data:
