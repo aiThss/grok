@@ -25,7 +25,7 @@ Muốn dùng Docker, sao chép `.env.example` thành `.env` và chạy `docker c
 | `GROK_BASE_URL` | Base URL gateway tương thích OpenAI; có hoặc không có `/v1` đều được chuẩn hóa |
 | `GROK_API_KEY` | API key của gateway, chỉ có trên server |
 | `GROK_DEFAULT_MODEL` | Model chat duy nhất được phép, mặc định `grok-4.5` |
-| `GROK_IMAGE_MODEL` | Model tạo ảnh, mặc định `grok-imagine-image` |
+| `GROK_IMAGE_MODEL` | Model tạo ảnh, mặc định `grok-imagine-image-2.0` |
 | `APP_PASSWORD` | Mật khẩu để mở web chat |
 | `SESSION_SECRET` | Chuỗi ngẫu nhiên tối thiểu 32 ký tự để ký session |
 
